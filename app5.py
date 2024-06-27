@@ -86,11 +86,11 @@ if uploaded_file is not None:
         df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
         st.write("Columns in the selected sheet:", df.columns.tolist())  # Debug output
 
-        if 'Weight' not in df.columns:
-            st.error("The selected sheet does not contain a 'Weight' column. Please select a valid sheet.")
+        if 'Weight (KG)' not in df.columns:
+            st.error("The selected sheet does not contain a 'Weight (KG)' column. Please select a valid sheet.")
         else:
             # Extract and classify weights
-            weights = df['Weight']
+            weights = df['Weight (KG)']
             D_a = len(weights[(weights > 0) & (weights <= 2)])
             D_b = len(weights[(weights > 2) & (weights <= 10)])
             D_c = len(weights[weights > 10])
