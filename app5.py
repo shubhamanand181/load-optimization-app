@@ -97,7 +97,7 @@ if uploaded_file is not None:
 
             W_a = weights[(weights > 0) & (weights <= 2)].sum()
             W_b = weights[(weights > 2) & (weights <= 10)].sum()
-            W_c = weights[weights > 10].sum()
+            W_c = weights[(weights > 10) & (weights <= 100)].sum()
 
             # Display the input data
             st.subheader("Input Data")
