@@ -3,7 +3,7 @@ import pandas as pd
 import pulp
 
 # Define the load optimization function
-def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, max_v1, max_v2, max_v3):
+def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, use_v3=True):
     # New weight capacities
     new_weight_capacity_v1 = 1000  # kg per day for v1
     new_weight_capacity_v2 = 500   # kg per day for v2
@@ -23,42 +23,51 @@ def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, max_v1, max_v2, max_v3):
     lp_problem = pulp.LpProblem("Delivery_Cost_Minimization", pulp.LpMinimize)
 
     # Define decision variables
-    V1 = pulp.LpVariable('V1', lowBound=0, upBound=max_v1, cat='Integer')
-    V2 = pulp.LpVariable('V2', lowBound=0, upBound=max_v2, cat='Integer')
-    V3 = pulp.LpVariable('V3', lowBound=0, upBound=max_v3, cat='Integer')
-
-    # Binary variables to track vehicle utilization
-    U1 = pulp.LpVariable('U1', lowBound=0, upBound=1, cat='Binary')
-    U2 = pulp.LpVariable('U2', lowBound=0, upBound=1, cat='Binary')
-    U3 = pulp.LpVariable('U3', lowBound=0, upBound=1, cat='Binary')
+    V1 = pulp.LpVariable('V1', lowBound=0, cat='Integer') if use_v1 else 0
+    V2 = pulp.LpVariable('V2', lowBound=0, cat='Integer') if use_v2 else 0
+    V3 = pulp.LpVariable('V3', lowBound=0, cat='Integer') if use_v3 else 0
 
     # Objective function
     lp_problem += cost_v1 * V1 + cost_v2 * V2 + cost_v3 * V3, "Total Cost"
 
     # Delivery constraints
-    lp_problem += v1_deliveries_per_day * V1 >= D_c, "V1_Delivery_Constraint"
-    lp_problem += v2_deliveries_per_day * V2 >= D_b, "V2_Delivery_Constraint"
-    lp_problem += v3_deliveries_per_day * V3 >= D_a, "V3_Delivery_Constraint"
-
-    # Weight constraints
-    lp_problem += new_weight_capacity_v1 * V1 >= W_c, "V1_Weight_Constraint"
-    lp_problem += new_weight_capacity_v2 * V2 >= W_b, "V2_Weight_Constraint"
-    lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint"
+    if use_v1:
+        lp_problem += v1_deliveries_per_day * V1 >= D_c, "V1_Delivery_Constraint"
+        lp_problem += new_weight_capacity_v1 * V1 >= W_c, "V1_Weight_Constraint"
+    if use_v2:
+        lp_problem += v2_deliveries_per_day * V2 >= D_b, "V2_Delivery_Constraint"
+        lp_problem += new_weight_capacity_v2 * V2 >= W_b, "V2_Weight_Constraint"
+    if use_v3:
+        lp_problem += v3_deliveries_per_day * V3 >= D_a, "V3_Delivery_Constraint"
+        lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint"
 
     # Simplified underutilization constraints
-    lp_problem += V1 <= max_v1 * (1 - U1), "V1_Underutilization_Constraint"
-    lp_problem += V2 <= max_v2 * (1 - U2), "V2_Underutilization_Constraint"
-    lp_problem += V3 <= max_v3 * (1 - U3), "V3_Underutilization_Constraint"
-    lp_problem += U1 + U2 + U3 <= 1, "Single_Underutilized_Vehicle_Constraint"
+    U1 = pulp.LpVariable('U1', lowBound=0, upBound=1, cat='Binary') if use_v1 else 0
+    U2 = pulp.LpVariable('U2', lowBound=0, upBound=1, cat='Binary') if use_v2 else 0
+    U3 = pulp.LpVariable('U3', lowBound=0, upBound=1, cat='Binary') if use_v3 else 0
+
+    if use_v1:
+        lp_problem += V1 <= (1 - U1), "V1_Underutilization_Constraint"
+    if use_v2:
+        lp_problem += V2 <= (1 - U2), "V2_Underutilization_Constraint"
+    if use_v3:
+        lp_problem += V3 <= (1 - U3), "V3_Underutilization_Constraint"
+
+    if use_v1 and use_v2 and use_v3:
+        lp_problem += U1 + U2 + U3 <= 1, "Single_Underutilized_Vehicle_Constraint"
+    elif use_v1 and use_v2:
+        lp_problem += U1 + U2 <= 1, "Single_Underutilized_Vehicle_Constraint"
+    elif use_v1 and use_v3:
+        lp_problem += U1 + U3 <= 1, "Single_Underutilized_Vehicle_Constraint"
 
     # Solve the problem
     lp_problem.solve()
 
     # Results
     status = pulp.LpStatus[lp_problem.status]
-    V1_value = pulp.value(V1)
-    V2_value = pulp.value(V2)
-    V3_value = pulp.value(V3)
+    V1_value = pulp.value(V1) if use_v1 else 0
+    V2_value = pulp.value(V2) if use_v2 else 0
+    V3_value = pulp.value(V3) if use_v3 else 0
     total_cost = pulp.value(lp_problem.objective)
 
     return status, V1_value, V2_value, V3_value, total_cost
@@ -113,20 +122,23 @@ if uploaded_file is not None:
             st.write(f"Type B Deliveries (2-10 kg): {D_b}, Total Weight: {W_b} kg")
             st.write(f"Type C Deliveries (>10 kg): {D_c}, Total Weight: {W_c} kg")
 
+            # Run optimization for all three cases
+            st.subheader("Optimization Results")
+
+            # Case 1: All vehicles
+            status, V1_value, V2_value, V3_value, total_cost = load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, use_v3=True)
+            st.write(f"**All Vehicles (V1, V2, V3)** - Status: {status}, V1: {V1_value}, V2: {V2_value}, V3: {V3_value}, Total Cost: {total_cost}")
+
+            # Case 2: Only V1 and V2
+            status, V1_value, V2_value, V3_value, total_cost = load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, use_v3=False)
+            st.write(f"**Only V1 and V2 (V3=0)** - Status: {status}, V1: {V1_value}, V2: {V2_value}, V3: {V3_value}, Total Cost: {total_cost}")
+
+            # Case 3: Only V1 and V3
+            status, V1_value, V2_value, V3_value, total_cost = load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=False, use_v3=True)
+            st.write(f"**Only V1 and V3 (V2=0)** - Status: {status}, V1: {V1_value}, V2: {V2_value}, V3: {V3_value}, Total Cost: {total_cost}")
+
     except Exception as e:
         st.error(f"An error occurred: {e}")
-
-# Manual entry option for number of deliveries
-st.sidebar.header("Manual Entry")
-D_a_manual = st.sidebar.number_input("Number of Type A Deliveries (0-2 kg)", min_value=0, value=0)
-D_b_manual = st.sidebar.number_input("Number of Type B Deliveries (2-10 kg)", min_value=0, value=0)
-D_c_manual = st.sidebar.number_input("Number of Type C Deliveries (>10 kg)", min_value=0, value=0)
-
-# Manual entry option for maximum number of vehicles available
-st.sidebar.header("Vehicle Availability")
-max_v1 = st.sidebar.number_input("Maximum number of V1 vehicles", min_value=0, value=0)
-max_v2 = st.sidebar.number_input("Maximum number of V2 vehicles", min_value=0, value=0)
-max_v3 = st.sidebar.number_input("Maximum number of V3 vehicles", min_value=0, value=0)
 
 # Descriptive message for vehicle types
 st.markdown("""
@@ -135,19 +147,3 @@ st.markdown("""
 - **V2**: Capacity 500 kg, 66 deliveries per day, Cost $33.00
 - **V3**: Capacity 60 kg, 72 deliveries per day, Cost $29.05
 """)
-
-# Run the load optimization model with manual input if provided
-if st.sidebar.button("Optimize with Manual Input"):
-    W_a_manual = D_a_manual * 1.5  # Average weight for Type A (example)
-    W_b_manual = D_b_manual * 6    # Average weight for Type B (example)
-    W_c_manual = D_c_manual * 15   # Average weight for Type C (example)
-    
-    status, V1_value, V2_value, V3_value, total_cost = load_optimization(D_a_manual, D_b_manual, D_c_manual, W_a_manual, W_b_manual, W_c_manual, max_v1, max_v2, max_v3)
-    
-    # Display the results
-    st.subheader("Optimization Results with Manual Input")
-    st.write(f"Status: {status}")
-    st.write(f"V1: {V1_value}")
-    st.write(f"V2: {V2_value}")
-    st.write(f"V3: {V3_value}")
-    st.write(f"Total Cost: {total_cost}")
