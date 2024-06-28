@@ -105,11 +105,11 @@ if uploaded_file is not None:
             weights = df['Weight (KG)']
             D_a = len(weights[(weights > 0) & (weights <= 2)])
             D_b = len(weights[(weights > 2) & (weights <= 10)])
-            D_c = len(weights[weights > 10])
+            D_c = len(weights[(weights > 10)  & (weights <= 100)])
 
             W_a = weights[(weights > 0) & (weights <= 2)].sum()
             W_b = weights[(weights > 2) & (weights <= 10)].sum()
-            W_c = weights[weights > 10].sum()
+            W_c = weights[(weights > 10) & (weights <= 100)].sum()
 
             st.write(f"Debug Weights: A: {W_a}, B: {W_b}, C: {W_c}")
 
