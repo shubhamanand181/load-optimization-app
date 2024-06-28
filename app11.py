@@ -27,13 +27,18 @@ def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, us
     V2 = pulp.LpVariable('V2', lowBound=0, cat='Integer') if use_v2 else 0
     V3 = pulp.LpVariable('V3', lowBound=0, cat='Integer') if use_v3 else 0
 
+    # Binary variables for underutilization
+    U1 = pulp.LpVariable('U1', lowBound=0, upBound=1, cat='Binary') if use_v1 else 0
+    U2 = pulp.LpVariable('U2', lowBound=0, upBound=1, cat='Binary') if use_v2 else 0
+    U3 = pulp.LpVariable('U3', lowBound=0, upBound=1, cat='Binary') if use_v3 else 0
+
     # Objective function
     lp_problem += cost_v1 * V1 + cost_v2 * V2 + cost_v3 * V3, "Total Cost"
 
-    # Delivery constraints
+    # Delivery and Weight Constraints for Each Vehicle Type
     if use_v1:
-        lp_problem += v1_deliveries_per_day * V1 >= D_c, "V1_Delivery_Constraint"
-        lp_problem += new_weight_capacity_v1 * V1 >= W_c, "V1_Weight_Constraint"
+        lp_problem += v1_deliveries_per_day * V1 >= (D_a + D_b + D_c), "V1_Delivery_Constraint"
+        lp_problem += new_weight_capacity_v1 * V1 >= (W_a + W_b + W_c), "V1_Weight_Constraint"
     if use_v2:
         lp_problem += v2_deliveries_per_day * V2 >= D_b, "V2_Delivery_Constraint"
         lp_problem += new_weight_capacity_v2 * V2 >= W_b, "V2_Weight_Constraint"
@@ -41,16 +46,13 @@ def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, us
         lp_problem += v3_deliveries_per_day * V3 >= D_a, "V3_Delivery_Constraint"
         lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint"
 
-    # Simplified underutilization constraints
+    # Adjust constraints for underutilization
     if use_v1:
-        U1 = pulp.LpVariable('U1', lowBound=0, upBound=1, cat='Binary')
-        lp_problem += V1 <= 1000 * (1 - U1), "V1_Underutilization_Constraint"
+        lp_problem += V1 <= (1 - U1) * 1000, "V1_Underutilization_Constraint"
     if use_v2:
-        U2 = pulp.LpVariable('U2', lowBound=0, upBound=1, cat='Binary')
-        lp_problem += V2 <= 1000 * (1 - U2), "V2_Underutilization_Constraint"
+        lp_problem += V2 <= (1 - U2) * 1000, "V2_Underutilization_Constraint"
     if use_v3:
-        U3 = pulp.LpVariable('U3', lowBound=0, upBound=1, cat='Binary')
-        lp_problem += V3 <= 1000 * (1 - U3), "V3_Underutilization_Constraint"
+        lp_problem += V3 <= (1 - U3) * 1000, "V3_Underutilization_Constraint"
 
     if use_v1 and use_v2 and use_v3:
         lp_problem += U1 + U2 + U3 <= 1, "Single_Underutilized_Vehicle_Constraint"
@@ -58,6 +60,18 @@ def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, us
         lp_problem += U1 + U2 <= 1, "Single_Underutilized_Vehicle_Constraint"
     elif use_v1 and use_v3:
         lp_problem += U1 + U3 <= 1, "Single_Underutilized_Vehicle_Constraint"
+
+    # Handle specific vehicle exclusions and reallocation
+    if use_v1 and not use_v2:
+        lp_problem += v1_deliveries_per_day * V1 >= (D_b + D_c), "V1_Delivery_Constraint_for_V2"
+        lp_problem += new_weight_capacity_v1 * V1 >= (W_b + W_c), "V1_Weight_Constraint_for_V2"
+        lp_problem += v3_deliveries_per_day * V3 >= D_a, "V3_Delivery_Constraint_for_V2"
+        lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint_for_V2"
+    if use_v1 and not use_v3:
+        lp_problem += v1_deliveries_per_day * V1 >= D_c, "V1_Delivery_Constraint_for_V3"
+        lp_problem += new_weight_capacity_v1 * V1 >= W_c, "V1_Weight_Constraint_for_V3"
+        lp_problem += v2_deliveries_per_day * V2 >= (D_a + D_b), "V2_Delivery_Constraint_for_V3"
+        lp_problem += new_weight_capacity_v2 * V2 >= (W_a + W_b), "V2_Weight_Constraint_for_V3"
 
     # Solve the problem
     lp_problem.solve()
@@ -105,7 +119,7 @@ if uploaded_file is not None:
             weights = df['Weight (KG)']
             D_a = len(weights[(weights > 0) & (weights <= 2)])
             D_b = len(weights[(weights > 2) & (weights <= 10)])
-            D_c = len(weights[(weights > 10)  & (weights <= 200)])
+            D_c = len(weights[(weights > 10) & (weights <= 200) ])
 
             W_a = weights[(weights > 0) & (weights <= 2)].sum()
             W_b = weights[(weights > 2) & (weights <= 10)].sum()
@@ -144,7 +158,7 @@ if uploaded_file is not None:
 # Descriptive message for vehicle types
 st.markdown("""
 ### Vehicle Type Descriptions:
-- **V1**: Capacity 1000 kg, 64 deliveries per day, Cost $62.82
-- **V2**: Capacity 500 kg, 66 deliveries per day, Cost $33.00
-- **V3**: Capacity 60 kg, 72 deliveries per day, Cost $29.05
+- **V1**: Capacity 1500 kg, Four wheeler mini truck
+- **V2**: Capacity 700 kg, three wheeler EV
+- **V3**: Capacity 60 kg, two wheeler EV
 """)
