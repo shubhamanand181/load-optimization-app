@@ -5,8 +5,8 @@ import pulp
 # Define the load optimization function
 def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, use_v3=True):
     # New weight capacities
-    new_weight_capacity_v1 = 1000  # kg per day for v1
-    new_weight_capacity_v2 = 500   # kg per day for v2
+    new_weight_capacity_v1 = 1500  # kg per day for v1
+    new_weight_capacity_v2 = 700   # kg per day for v2
     new_weight_capacity_v3 = 60    # kg per day for v3
 
     # New delivery capacities based on time constraints
@@ -105,11 +105,11 @@ if uploaded_file is not None:
             weights = df['Weight (KG)']
             D_a = len(weights[(weights > 0) & (weights <= 2)])
             D_b = len(weights[(weights > 2) & (weights <= 10)])
-            D_c = len(weights[(weights > 10)  & (weights <= 100)])
+            D_c = len(weights[(weights > 10)  & (weights <= 200)])
 
             W_a = weights[(weights > 0) & (weights <= 2)].sum()
             W_b = weights[(weights > 2) & (weights <= 10)].sum()
-            W_c = weights[(weights > 10) & (weights <= 100)].sum()
+            W_c = weights[(weights > 10) & (weights <= 200)].sum()
 
             st.write(f"Debug Weights: A: {W_a}, B: {W_b}, C: {W_c}")
 
