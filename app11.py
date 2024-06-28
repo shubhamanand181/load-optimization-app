@@ -36,15 +36,10 @@ def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, us
     lp_problem += cost_v1 * V1 + cost_v2 * V2 + cost_v3 * V3, "Total Cost"
 
     # Delivery and Weight Constraints for Each Vehicle Type
-    if use_v1:
-        lp_problem += v1_deliveries_per_day * V1 >= (D_a + D_b + D_c), "V1_Delivery_Constraint"
-        lp_problem += new_weight_capacity_v1 * V1 >= (W_a + W_b + W_c), "V1_Weight_Constraint"
-    if use_v2:
-        lp_problem += v2_deliveries_per_day * V2 >= D_b, "V2_Delivery_Constraint"
-        lp_problem += new_weight_capacity_v2 * V2 >= W_b, "V2_Weight_Constraint"
-    if use_v3:
-        lp_problem += v3_deliveries_per_day * V3 >= D_a, "V3_Delivery_Constraint"
-        lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint"
+   if use_v1 or use_v2 or use_v3:
+    lp_problem += v1_deliveries_per_day * V1 + (v2_deliveries_per_day * V2 if use_v2 else 0) + (v3_deliveries_per_day * V3 if use_v3 else 0) >= (D_a + D_b + D_c), "Total_Delivery_Constraint"
+    lp_problem += new_weight_capacity_v1 * V1 + (new_weight_capacity_v2 * V2 if use_v2 else 0) + (new_weight_capacity_v3 * V3 if use_v3 else 0) >= (W_a + W_b + W_c), "Total_Weight_Constraint"
+
 
     # Adjust constraints for underutilization
     if use_v1:
