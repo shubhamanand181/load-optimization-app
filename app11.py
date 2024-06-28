@@ -45,11 +45,11 @@ def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, max_v1, max_v2, max_v3):
     lp_problem += new_weight_capacity_v2 * V2 >= W_b, "V2_Weight_Constraint"
     lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint"
 
-    # Ensure at most one vehicle is underutilized
-    lp_problem += U1 + U2 + U3 <= 1, "Underutilized_Vehicle_Constraint"
-    lp_problem += V1 <= U1 * max_v1, "V1_Underutilization"
-    lp_problem += V2 <= U2 * max_v2, "V2_Underutilization"
-    lp_problem += V3 <= U3 * max_v3, "V3_Underutilization"
+    # Simplified underutilization constraints
+    lp_problem += V1 <= max_v1 * (1 - U1), "V1_Underutilization_Constraint"
+    lp_problem += V2 <= max_v2 * (1 - U2), "V2_Underutilization_Constraint"
+    lp_problem += V3 <= max_v3 * (1 - U3), "V3_Underutilization_Constraint"
+    lp_problem += U1 + U2 + U3 <= 1, "Single_Underutilized_Vehicle_Constraint"
 
     # Solve the problem
     lp_problem.solve()
@@ -101,7 +101,7 @@ if uploaded_file is not None:
 
             W_a = weights[(weights > 0) & (weights <= 2)].sum()
             W_b = weights[(weights > 2) & (weights <= 10)].sum()
-            W_c = weights[weights > 10 & (weights <= 100)].sum()
+            W_c = weights[weights > 10].sum()
 
             # Display the input data
             st.subheader("Input Data")
