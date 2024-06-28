@@ -42,16 +42,15 @@ def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c, use_v1=True, use_v2=True, us
         lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint"
 
     # Simplified underutilization constraints
-    U1 = pulp.LpVariable('U1', lowBound=0, upBound=1, cat='Binary') if use_v1 else 0
-    U2 = pulp.LpVariable('U2', lowBound=0, upBound=1, cat='Binary') if use_v2 else 0
-    U3 = pulp.LpVariable('U3', lowBound=0, upBound=1, cat='Binary') if use_v3 else 0
-
     if use_v1:
-        lp_problem += V1 <= (1 - U1), "V1_Underutilization_Constraint"
+        U1 = pulp.LpVariable('U1', lowBound=0, upBound=1, cat='Binary')
+        lp_problem += V1 <= 1000 * (1 - U1), "V1_Underutilization_Constraint"
     if use_v2:
-        lp_problem += V2 <= (1 - U2), "V2_Underutilization_Constraint"
+        U2 = pulp.LpVariable('U2', lowBound=0, upBound=1, cat='Binary')
+        lp_problem += V2 <= 1000 * (1 - U2), "V2_Underutilization_Constraint"
     if use_v3:
-        lp_problem += V3 <= (1 - U3), "V3_Underutilization_Constraint"
+        U3 = pulp.LpVariable('U3', lowBound=0, upBound=1, cat='Binary')
+        lp_problem += V3 <= 1000 * (1 - U3), "V3_Underutilization_Constraint"
 
     if use_v1 and use_v2 and use_v3:
         lp_problem += U1 + U2 + U3 <= 1, "Single_Underutilized_Vehicle_Constraint"
@@ -111,6 +110,8 @@ if uploaded_file is not None:
             W_a = weights[(weights > 0) & (weights <= 2)].sum()
             W_b = weights[(weights > 2) & (weights <= 10)].sum()
             W_c = weights[weights > 10].sum()
+
+            st.write(f"Debug Weights: A: {W_a}, B: {W_b}, C: {W_c}")
 
             # Display the input data
             st.subheader("Input Data")
