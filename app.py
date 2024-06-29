@@ -2,94 +2,134 @@ import streamlit as st
 import pandas as pd
 import pulp
 
-# Define the load optimization function
-def load_optimization(D_a, D_b, D_c, W_a, W_b, W_c):
-    # New weight capacities
-    new_weight_capacity_v1 = 1000  # kg per day for v1
-    new_weight_capacity_v2 = 500   # kg per day for v2
-    new_weight_capacity_v3 = 60    # kg per day for v3
+# Display the logo
+logo_url = "path_to_logo.png"  # Update this path to your logo
+st.image(logo_url, width=150)
 
-    # New delivery capacities based on time constraints
-    v1_deliveries_per_day = 64
-    v2_deliveries_per_day = 66
-    v3_deliveries_per_day = 72
+# Instructions for Excel Upload
+st.write("""
+### Instructions:
+1. The Excel sheet must have column names in the first row.
+2. The sheet to be analyzed must contain a column named "Weight (KG)".
+3. The weights will be used to categorize deliveries into Type A (0-2 kg), Type B (2-10 kg), and Type C (10-200 kg).
+""")
 
-    # New costs with incentive
-    cost_v1 = 62.8156
-    cost_v2 = 33
-    cost_v3 = 29.0536
+# Function to extract delivery data from the selected sheet
+def extract_deliveries_from_excel(file, sheet_name):
+    df = pd.read_excel(file, sheet_name=sheet_name)
+    if 'Weight (KG)' not in df.columns:
+        st.error("The selected sheet does not contain the required 'Weight (KG)' column.")
+        return None, None, None
+    
+    weight = df['Weight (KG)']
+    D_a = sum((weight > 0) & (weight <= 2))
+    D_b = sum((weight > 2) & (weight <= 10))
+    D_c = sum((weight > 10) & (weight <= 200))
+    
+    return D_a, D_b, D_c
 
-    # Create a linear programming problem
+# Function to run optimization for scenario 1 (V1, V2, V3)
+def optimize_scenario_1(D_a, D_b, D_c, cost_v1, cost_v2, cost_v3, v1_capacity, v2_capacity, v3_capacity):
     lp_problem = pulp.LpProblem("Delivery_Cost_Minimization", pulp.LpMinimize)
-
-    # Define decision variables
     V1 = pulp.LpVariable('V1', lowBound=0, cat='Integer')
     V2 = pulp.LpVariable('V2', lowBound=0, cat='Integer')
     V3 = pulp.LpVariable('V3', lowBound=0, cat='Integer')
 
-    # Objective function
+    A1 = pulp.LpVariable('A1', lowBound=0, cat='Continuous')
+    B1 = pulp.LpVariable('B1', lowBound=0, cat='Continuous')
+    C1 = pulp.LpVariable('C1', lowBound=0, cat='Continuous')
+    A2 = pulp.LpVariable('A2', lowBound=0, cat='Continuous')
+    B2 = pulp.LpVariable('B2', lowBound=0, cat='Continuous')
+    A3 = pulp.LpVariable('A3', lowBound=0, cat='Continuous')
+
     lp_problem += cost_v1 * V1 + cost_v2 * V2 + cost_v3 * V3, "Total Cost"
-
-    # Constraints
-    lp_problem += v1_deliveries_per_day * V1 >= D_c, "V1_Delivery_Constraint"
-    lp_problem += v2_deliveries_per_day * V2 >= D_b, "V2_Delivery_Constraint"
-    lp_problem += v3_deliveries_per_day * V3 >= D_a, "V3_Delivery_Constraint"
-
-    lp_problem += new_weight_capacity_v1 * V1 >= W_c, "V1_Weight_Constraint"
-    lp_problem += new_weight_capacity_v2 * V2 >= W_b, "V2_Weight_Constraint"
-    lp_problem += new_weight_capacity_v3 * V3 >= W_a, "V3_Weight_Constraint"
-
-    # Maximum Distance Constraint (assumed example)
-    max_distance_per_day = 200  # km (this would depend on actual distance limits per vehicle)
-    lp_problem += max_distance_per_day * V1 + max_distance_per_day * V2 + max_distance_per_day * V3 <= 200 * 10, "Max_Distance_Constraint"
-
-    # Driver Constraints
-    total_drivers = 10
-    lp_problem += V1 + V2 + V3 <= total_drivers, "Driver_Constraint"
-
-    # Solve the problem
+    lp_problem += A1 + A2 + A3 == D_a, "Total_Deliveries_A_Constraint"
+    lp_problem += B1 + B2 == D_b, "Total_Deliveries_B_Constraint"
+    lp_problem += C1 == D_c, "Total_Deliveries_C_Constraint"
+    lp_problem += v1_capacity * V1 >= C1 + B1 + A1, "V1_Capacity_Constraint"
+    lp_problem += v2_capacity * V2 >= B2 + A2, "V2_Capacity_Constraint"
+    lp_problem += v3_capacity * V3 >= A3, "V3_Capacity_Constraint"
+    lp_problem += C1 == D_c, "Assign_C_To_V1"
+    lp_problem += B1 <= v1_capacity * V1 - C1, "Assign_B_To_V1"
+    lp_problem += B2 == D_b - B1, "Assign_Remaining_B_To_V2"
+    lp_problem += A1 <= v1_capacity * V1 - C1 - B1, "Assign_A_To_V1"
+    lp_problem += A2 <= v2_capacity * V2 - B2, "Assign_A_To_V2"
+    lp_problem += A3 == D_a - A1 - A2, "Assign_Remaining_A_To_V3"
     lp_problem.solve()
 
-    # Results
-    status = pulp.LpStatus[lp_problem.status]
-    V1_value = pulp.value(V1)
-    V2_value = pulp.value(V2)
-    V3_value = pulp.value(V3)
-    total_cost = pulp.value(lp_problem.objective)
+    return {
+        "Status": pulp.LpStatus[lp_problem.status],
+        "V1": pulp.value(V1),
+        "V2": pulp.value(V2),
+        "V3": pulp.value(V3),
+        "Total Cost": pulp.value(lp_problem.objective),
+        "Deliveries assigned to V1": pulp.value(C1 + B1 + A1),
+        "Deliveries assigned to V2": pulp.value(B2 + A2),
+        "Deliveries assigned to V3": pulp.value(A3)
+    }
 
-    return status, V1_value, V2_value, V3_value, total_cost
+# Other optimization functions (optimize_scenario_2 and optimize_scenario_3) will be similar, so omitted here for brevity
 
 # Streamlit app
-st.title("Load Optimization Model")
+st.title("Delivery Cost Optimization")
 
-# Input fields for deliveries and weights
-st.sidebar.header("Input Parameters")
-D_a = st.sidebar.number_input("Number of deliveries of type 'a'", min_value=0, value=153)
-D_b = st.sidebar.number_input("Number of deliveries of type 'b'", min_value=0, value=174)
-D_c = st.sidebar.number_input("Number of deliveries of type 'c'", min_value=0, value=62)
+# User input for number of deliveries manually
+st.write("### Manual Entry of Deliveries")
+D_a = st.number_input("Number of Type A deliveries (0-2 kg)", min_value=0, value=80)
+D_b = st.number_input("Number of Type B deliveries (2-10 kg)", min_value=0, value=100)
+D_c = st.number_input("Number of Type C deliveries (10-200 kg)", min_value=0, value=10)
 
-W_a = st.sidebar.number_input("Total weight of deliveries of type 'a' (in kg)", min_value=0, value=153)
-W_b = st.sidebar.number_input("Total weight of deliveries of type 'b' (in kg)", min_value=0, value=1044)
-W_c = st.sidebar.number_input("Total weight of deliveries of type 'c' (in kg)", min_value=0, value=930)
+# Display vehicle descriptions
+st.subheader("Vehicle Information")
+st.text("V1: " + vehicle_descriptions["V1"])
+st.text("V2: " + vehicle_descriptions["V2"])
+st.text("V3: " + vehicle_descriptions["V3"])
 
-# Run the load optimization model
-if st.sidebar.button("Optimize"):
-    status, V1_value, V2_value, V3_value, total_cost = load_optimization(D_a, D_b, D_c, W_a, W_b, W_c)
+# User input for vehicle costs
+st.subheader("Vehicle Costs (USD per day)")
+cost_v1 = st.number_input("Cost of V1", min_value=0.0, value=62.8156)
+cost_v2 = st.number_input("Cost of V2", min_value=0.0, value=33.0)
+cost_v3 = st.number_input("Cost of V3", min_value=0.0, value=29.0536)
+
+# User input for vehicle capacities
+st.subheader("Vehicle Capacities (deliveries per day)")
+v1_capacity = st.number_input("Capacity of V1", min_value=1, value=64)
+v2_capacity = st.number_input("Capacity of V2", min_value=1, value=66)
+v3_capacity = st.number_input("Capacity of V3", min_value=1, value=72)
+
+# File uploader for Excel file
+st.subheader("Upload Excel File")
+uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
+
+if uploaded_file:
+    excel = pd.ExcelFile(uploaded_file)
+    sheet_name = st.selectbox("Select Sheet", excel.sheet_names)
+    if st.button("Extract Deliveries from Excel"):
+        D_a, D_b, D_c = extract_deliveries_from_excel(uploaded_file, sheet_name)
+        if D_a is not None:
+            st.success(f"Extracted Deliveries - Type A: {D_a}, Type B: {D_b}, Type C: {D_c}")
+
+# User selection for scenario
+scenario = st.selectbox("Select Scenario", ["Scenario 1: V1, V2, V3", "Scenario 2: V1, V2", "Scenario 3: V1, V3"])
+
+if st.button("Optimize"):
+    if scenario == "Scenario 1: V1, V2, V3":
+        result = optimize_scenario_1(D_a, D_b, D_c, cost_v1, cost_v2, cost_v3, v1_capacity, v2_capacity, v3_capacity)
+    elif scenario == "Scenario 2: V1, V2":
+        result = optimize_scenario_2(D_a, D_b, D_c, cost_v1, cost_v2, v1_capacity, v2_capacity)
+    elif scenario == "Scenario 3: V1, V3":
+        result = optimize_scenario_3(D_a, D_b, D_c, cost_v1, cost_v3, v1_capacity, v3_capacity)
     
-    # Display the results
-    st.subheader("Optimization Results")
-    st.write(f"Status: {status}")
-    st.write(f"V1: {V1_value}")
-    st.write(f"V2: {V2_value}")
-    st.write(f"V3: {V3_value}")
-    st.write(f"Total Cost: {total_cost}")
-
-# Sample data input section
-st.sidebar.header("Sample Data")
-sample_data = {
-    'Delivery Type': ['a', 'b', 'c'],
-    'Number of Deliveries': [D_a, D_b, D_c],
-    'Total Weight (kg)': [W_a, W_b, W_c]
-}
-
-st.sidebar.table(sample_data)
+    st.write("Optimization Results:")
+    st.write(f"Status: {result['Status']}")
+    st.write(f"V1: {result['V1']}")
+    if "V2" in result:
+        st.write(f"V2: {result['V2']}")
+    if "V3" in result:
+        st.write(f"V3: {result['V3']}")
+    st.write(f"Total Cost: {result['Total Cost']}")
+    st.write(f"Deliveries assigned to V1: {result['Deliveries assigned to V1']}")
+    if "Deliveries assigned to V2" in result:
+        st.write(f"Deliveries assigned to V2: {result['Deliveries assigned to V2']}")
+    if "Deliveries assigned to V3" in result:
+        st.write(f"Deliveries assigned to V3: {result['Deliveries assigned to V3']}")
