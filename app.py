@@ -73,44 +73,121 @@ cost_v3 = st.number_input("Cost of V3", min_value=0.0, value=29.0536)
 # User selection for scenario
 scenario = st.selectbox("Select Scenario", ["Scenario 1: V1, V2, V3", "Scenario 2: V1, V2", "Scenario 3: V1, V3"])
 
-# Functions to run optimizations (details omitted for brevity)
+# Functions to run optimizations
 def optimize_scenario_1(D_a, D_b, D_c, cost_v1, cost_v2, cost_v3, v1_capacity, v2_capacity, v3_capacity):
-    # Optimization logic here
+    lp_problem = pulp.LpProblem("Delivery_Cost_Minimization", pulp.LpMinimize)
+    V1 = pulp.LpVariable('V1', lowBound=0, cat='Integer')
+    V2 = pulp.LpVariable('V2', lowBound=0, cat='Integer')
+    V3 = pulp.LpVariable('V3', lowBound=0, cat='Integer')
+
+    A1 = pulp.LpVariable('A1', lowBound=0, cat='Continuous')
+    B1 = pulp.LpVariable('B1', lowBound=0, cat='Continuous')
+    C1 = pulp.LpVariable('C1', lowBound=0, cat='Continuous')
+    A2 = pulp.LpVariable('A2', lowBound=0, cat='Continuous')
+    B2 = pulp.LpVariable('B2', lowBound=0, cat='Continuous')
+    A3 = pulp.LpVariable('A3', lowBound=0, cat='Continuous')
+
+    lp_problem += cost_v1 * V1 + cost_v2 * V2 + cost_v3 * V3, "Total Cost"
+    lp_problem += A1 + A2 + A3 == D_a, "Total_Deliveries_A_Constraint"
+    lp_problem += B1 + B2 == D_b, "Total_Deliveries_B_Constraint"
+    lp_problem += C1 == D_c, "Total_Deliveries_C_Constraint"
+    lp_problem += v1_capacity * V1 >= C1 + B1 + A1, "V1_Capacity_Constraint"
+    lp_problem += v2_capacity * V2 >= B2 + A2, "V2_Capacity_Constraint"
+    lp_problem += v3_capacity * V3 >= A3, "V3_Capacity_Constraint"
+    lp_problem += C1 == D_c, "Assign_C_To_V1"
+    lp_problem += B1 <= v1_capacity * V1 - C1, "Assign_B_To_V1"
+    lp_problem += B2 == D_b - B1, "Assign_Remaining_B_To_V2"
+    lp_problem += A1 <= v1_capacity * V1 - C1 - B1, "Assign_A_To_V1"
+    lp_problem += A2 <= v2_capacity * V2 - B2, "Assign_A_To_V2"
+    lp_problem += A3 == D_a - A1 - A2, "Assign_Remaining_A_To_V3"
+    lp_problem.solve()
+
     return {
-        "Status": "Optimal",
-        "V1": 1,
-        "V2": 1,
-        "V3": 1,
-        "Total Cost": 100.0,
-        "Deliveries assigned to V1": 40,
-        "Deliveries assigned to V2": 30,
-        "Deliveries assigned to V3": 50
+        "Status": pulp.LpStatus[lp_problem.status],
+        "V1": pulp.value(V1),
+        "V2": pulp.value(V2),
+        "V3": pulp.value(V3),
+        "Total Cost": pulp.value(lp_problem.objective),
+        "Deliveries assigned to V1": pulp.value(C1 + B1 + A1),
+        "Deliveries assigned to V2": pulp.value(B2 + A2),
+        "Deliveries assigned to V3": pulp.value(A3)
     }
 
 def optimize_scenario_2(D_a, D_b, D_c, cost_v1, cost_v2, v1_capacity, v2_capacity):
-    # Optimization logic here
+    lp_problem = pulp.LpProblem("Delivery_Cost_Minimization", pulp.LpMinimize)
+
+    V1 = pulp.LpVariable('V1', lowBound=0, cat='Integer')
+    V2 = pulp.LpVariable('V2', lowBound=0, cat='Integer')
+
+    A1 = pulp.LpVariable('A1', lowBound=0, cat='Continuous')
+    B1 = pulp.LpVariable('B1', lowBound=0, cat='Continuous')
+    C1 = pulp.LpVariable('C1', lowBound=0, cat='Continuous')
+    A2 = pulp.LpVariable('A2', lowBound=0, cat='Continuous')
+    B2 = pulp.LpVariable('B2', lowBound=0, cat='Continuous')
+
+    lp_problem += cost_v1 * V1 + cost_v2 * V2, "Total Cost"
+
+    lp_problem += A1 + A2 == D_a, "Total_Deliveries_A_Constraint"
+    lp_problem += B1 + B2 == D_b, "Total_Deliveries_B_Constraint"
+    lp_problem += C1 == D_c, "Total_Deliveries_C_Constraint"
+
+    lp_problem += v1_capacity * V1 >= C1 + B1 + A1, "V1_Capacity_Constraint"
+    lp_problem += v2_capacity * V2 >= B2 + A2, "V2_Capacity_Constraint"
+
+    lp_problem += C1 == D_c, "Assign_C_To_V1"
+    lp_problem += B1 <= v1_capacity * V1 - C1, "Assign_B_To_V1"
+    lp_problem += B2 == D_b - B1, "Assign_Remaining_B_To_V2"
+    lp_problem += A1 <= v1_capacity * V1 - C1 - B1, "Assign_A_To_V1"
+    lp_problem += A2 == D_a - A1, "Assign_Remaining_A_To_V2"
+
+    lp_problem.solve()
+
     return {
-        "Status": "Optimal",
-        "V1": 1,
-        "V2": 1,
-        "Total Cost": 100.0,
-        "Deliveries assigned to V1": 40,
-        "Deliveries assigned to V2": 60
+        "Status": pulp.LpStatus[lp_problem.status],
+        "V1": pulp.value(V1),
+        "V2": pulp.value(V2),
+        "Total Cost": pulp.value(lp_problem.objective),
+        "Deliveries assigned to V1": pulp.value(C1 + B1 + A1),
+        "Deliveries assigned to V2": pulp.value(B2 + A2)
     }
 
 def optimize_scenario_3(D_a, D_b, D_c, cost_v1, cost_v3, v1_capacity, v3_capacity):
-    # Optimization logic here
+    lp_problem = pulp.LpProblem("Delivery_Cost_Minimization", pulp.LpMinimize)
+
+    V1 = pulp.LpVariable('V1', lowBound=0, cat='Integer')
+    V3 = pulp.LpVariable('V3', lowBound=0, cat='Integer')
+
+    A1 = pulp.LpVariable('A1', lowBound=0, cat='Continuous')
+    B1 = pulp.LpVariable('B1', lowBound=0, cat='Continuous')
+    C1 = pulp.LpVariable('C1', lowBound=0, cat='Continuous')
+    A3 = pulp.LpVariable('A3', lowBound=0, cat='Continuous')
+
+    lp_problem += cost_v1 * V1 + cost_v3 * V3, "Total Cost"
+
+    lp_problem += A1 + A3 == D_a, "Total_Deliveries_A_Constraint"
+    lp_problem += B1 == D_b, "Total_Deliveries_B_Constraint"
+    lp_problem += C1 == D_c, "Total_Deliveries_C_Constraint"
+
+    lp_problem += v1_capacity * V1 >= C1 + B1 + A1, "V1_Capacity_Constraint"
+    lp_problem += v3_capacity * V3 >= A3, "V3_Capacity_Constraint"
+
+    lp_problem += C1 == D_c, "Assign_C_To_V1"
+    lp_problem += B1 <= v1_capacity * V1 - C1, "Assign_B_To_V1"
+    lp_problem += A1 <= v1_capacity * V1 - C1 - B1, "Assign_A_To_V1"
+    lp_problem += A3 == D_a - A1, "Assign_Remaining_A_To_V3"
+
+    lp_problem.solve()
+
     return {
-        "Status": "Optimal",
-        "V1": 1,
-        "V3": 1,
-        "Total Cost": 100.0,
-        "Deliveries assigned to V1": 40,
-        "Deliveries assigned to V3": 60
+        "Status": pulp.LpStatus[lp_problem.status],
+        "V1": pulp.value(V1),
+        "V3": pulp.value(V3),
+        "Total Cost": pulp.value(lp_problem.objective),
+        "Deliveries assigned to V1": pulp.value(C1 + B1 + A1),
+        "Deliveries assigned to V3": pulp.value(A3)
     }
 
 if st.button("Optimize"):
-    result = None
     if scenario == "Scenario 1: V1, V2, V3":
         result = optimize_scenario_1(D_a, D_b, D_c, cost_v1, cost_v2, cost_v3, v1_capacity, v2_capacity, v3_capacity)
     elif scenario == "Scenario 2: V1, V2":
@@ -118,19 +195,16 @@ if st.button("Optimize"):
     elif scenario == "Scenario 3: V1, V3":
         result = optimize_scenario_3(D_a, D_b, D_c, cost_v1, cost_v3, v1_capacity, v3_capacity)
     
-    if result:
-        st.write("Optimization Results:")
-        st.write(f"Status: {result['Status']}")
-        st.write(f"V1: {result['V1']}")
-        if "V2" in result:
-            st.write(f"V2: {result['V2']}")
-        if "V3" in result:
-            st.write(f"V3: {result['V3']}")
-        st.write(f"Total Cost: {result['Total Cost']}")
-        st.write(f"Deliveries assigned to V1: {result['Deliveries assigned to V1']}")
-        if "Deliveries assigned to V2" in result:
-            st.write(f"Deliveries assigned to V2: {result['Deliveries assigned to V2']}")
-        if "Deliveries assigned to V3" in result:
-            st.write(f"Deliveries assigned to V3: {result['Deliveries assigned to V3']}")
-    else:
-        st.error("Optimization failed. Please check the inputs and try again.")
+    st.write("Optimization Results:")
+    st.write(f"Status: {result['Status']}")
+    st.write(f"V1: {result['V1']}")
+    if "V2" in result:
+        st.write(f"V2: {result['V2']}")
+    if "V3" in result:
+        st.write(f"V3: {result['V3']}")
+    st.write(f"Total Cost: {result['Total Cost']}")
+    st.write(f"Deliveries assigned to V1: {result['Deliveries assigned to V1']}")
+    if "Deliveries assigned to V2" in result:
+        st.write(f"Deliveries assigned to V2: {result['Deliveries assigned to V2']}")
+    if "Deliveries assigned to V3" in result:
+        st.write(f"Deliveries assigned to V3: {result['Deliveries assigned to V3']}")
