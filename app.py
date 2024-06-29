@@ -15,14 +15,6 @@ D_c = st.number_input("Number of Type C deliveries (10-200 kg)", min_value=0, va
 st.subheader("Upload Excel File")
 uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
 
-if uploaded_file:
-    excel = pd.ExcelFile(uploaded_file)
-    sheet_name = st.selectbox("Select Sheet", excel.sheet_names)
-    if st.button("Extract Deliveries from Excel"):
-        D_a, D_b, D_c = extract_deliveries_from_excel(uploaded_file, sheet_name)
-        if D_a is not None:
-            st.success(f"Extracted Deliveries - Type A: {D_a}, Type B: {D_b}, Type C: {D_c}")
-
 # Instructions for Excel Upload
 st.write("""
 ### Instructions:
@@ -30,6 +22,29 @@ st.write("""
 2. The sheet to be analyzed must contain a column named "Weight (KG)".
 3. The weights will be used to categorize deliveries into Type A (0-2 kg), Type B (2-10 kg), and Type C (10-200 kg).
 """)
+
+# Function to extract delivery data from the selected sheet
+def extract_deliveries_from_excel(file, sheet_name):
+    df = pd.read_excel(file, sheet_name=sheet_name)
+    if 'Weight (KG)' not in df.columns:
+        st.error("The selected sheet does not contain the required 'Weight (KG)' column.")
+        return None, None, None
+    
+    weight = df['Weight (KG)']
+    D_a = sum((weight > 0) & (weight <= 2))
+    D_b = sum((weight > 2) & (weight <= 10))
+    D_c = sum((weight > 10) & (weight <= 200))
+    
+    return D_a, D_b, D_c
+
+# Extract deliveries from uploaded Excel file
+if uploaded_file:
+    excel = pd.ExcelFile(uploaded_file)
+    sheet_name = st.selectbox("Select Sheet", excel.sheet_names)
+    if st.button("Extract Deliveries from Excel"):
+        D_a, D_b, D_c = extract_deliveries_from_excel(uploaded_file, sheet_name)
+        if D_a is not None:
+            st.success(f"Extracted Deliveries - Type A: {D_a}, Type B: {D_b}, Type C: {D_c}")
 
 # Display vehicle descriptions
 vehicle_descriptions = {
@@ -57,6 +72,19 @@ cost_v3 = st.number_input("Cost of V3", min_value=0.0, value=29.0536)
 
 # User selection for scenario
 scenario = st.selectbox("Select Scenario", ["Scenario 1: V1, V2, V3", "Scenario 2: V1, V2", "Scenario 3: V1, V3"])
+
+# Functions to run optimizations (details omitted for brevity)
+def optimize_scenario_1(D_a, D_b, D_c, cost_v1, cost_v2, cost_v3, v1_capacity, v2_capacity, v3_capacity):
+    # Optimization logic here
+    pass
+
+def optimize_scenario_2(D_a, D_b, D_c, cost_v1, cost_v2, v1_capacity, v2_capacity):
+    # Optimization logic here
+    pass
+
+def optimize_scenario_3(D_a, D_b, D_c, cost_v1, cost_v3, v1_capacity, v3_capacity):
+    # Optimization logic here
+    pass
 
 if st.button("Optimize"):
     if scenario == "Scenario 1: V1, V2, V3":
