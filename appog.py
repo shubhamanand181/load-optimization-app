@@ -65,10 +65,10 @@ v2_capacity = st.number_input("Capacity of V2", min_value=1, value=66)
 v3_capacity = st.number_input("Capacity of V3", min_value=1, value=72)
 
 # User input for vehicle costs
-st.subheader("Vehicle Costs (USD per day)")
-cost_v1 = st.number_input("Cost of V1", min_value=0.0, value=62.8156)
-cost_v2 = st.number_input("Cost of V2", min_value=0.0, value=33.0)
-cost_v3 = st.number_input("Cost of V3", min_value=0.0, value=29.0536)
+st.subheader("Vehicle Costs (INR per day)")
+cost_v1 = st.number_input("Cost of V1", min_value=0.0, value=2416)
+cost_v2 = st.number_input("Cost of V2", min_value=0.0, value=1270)
+cost_v3 = st.number_input("Cost of V3", min_value=0.0, value=1115)
 
 # User selection for scenario
 scenario = st.selectbox("Select Scenario", ["Scenario 1: V1, V2, V3", "Scenario 2: V1, V2", "Scenario 3: V1, V3"])
